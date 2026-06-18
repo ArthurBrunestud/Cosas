@@ -105,21 +105,11 @@ class SystemEventLog(Base):
 
     id = Column(Integer, primary_key=True)
     session_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
-    event_type = Column(
-        String(50),
-        nullable=False,
-        info={
-            "check": "event_type IN ("
-                     "'no_internet', 'permission_revoked', 'gps_unavailable', "
-                     "'foreground_service_closed', 'sync_failed', "
-                     "'mock_location_detected', 'other')"
-        }
-    )
-    detail = Column(Text)
+    event_type = Column(String(50), nullable=False)
+    detail = Column(Text, nullable=True)
+    duration_minutes = Column(Integer, nullable=True)
     occurred_at = Column(TIMESTAMP(timezone=True), nullable=False)
     synced = Column(Boolean, nullable=False, default=True)
-
-    session = relationship("Session", back_populates="system_event_logs")
 
 
 class PlaceCheckin(Base):
@@ -140,3 +130,11 @@ class PlaceCheckin(Base):
     session = relationship("Session", back_populates="checkins")
     place = relationship("Place", back_populates="checkins")
     user = relationship("User", back_populates="checkins")
+
+class HeartbeatLog(Base):
+    __tablename__ = "heartbeat_logs"
+
+    id = Column(Integer, primary_key=True)
+    session_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
+    sent_at = Column(TIMESTAMP(timezone=True), nullable=False)
+    responded = Column(Boolean, nullable=False, default=False)

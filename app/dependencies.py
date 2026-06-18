@@ -26,7 +26,16 @@ async def get_current_user(
     user = result.scalar_one_or_none()
     if not user or not user.active:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
+
     return user
+
+
+async def get_current_manager(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    if current_user.role != "manager":
+        raise HTTPException(status_code=403, detail="Acceso solo para supervisores")
+    return current_user
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(bearer),
@@ -50,3 +59,10 @@ async def get_current_user(
     if not user or not user.active:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
     return user
+
+async def get_current_manager(
+    current_user: User = Depends(get_current_user)
+) -> User:
+    if current_user.role != "manager":
+        raise HTTPException(status_code=403, detail="Acceso solo para supervisores")
+    return current_user
