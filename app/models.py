@@ -130,11 +130,3 @@ class PlaceCheckin(Base):
     session = relationship("Session", back_populates="checkins")
     place = relationship("Place", back_populates="checkins")
     user = relationship("User", back_populates="checkins")
-
-class HeartbeatLog(Base):
-    __tablename__ = "heartbeat_logs"
-
-    id = Column(Integer, primary_key=True)
-    session_id = Column(Integer, ForeignKey("sessions.id", ondelete="CASCADE"), nullable=False)
-    sent_at = Column(TIMESTAMP(timezone=True), nullable=False)
-    responded = Column(Boolean, nullable=False, default=False)
