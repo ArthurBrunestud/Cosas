@@ -53,3 +53,22 @@ async def checkin(
     await db.commit()
     await db.refresh(checkin)
     return checkin
+
+
+@router.delete("/{place_id}", status_code=204)
+async def delete_place(
+    place_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(Place).where(Place.id == place_id)
+    )
+    place = result.scalar_one_or_none()
+    if not place:
+        raise HTTPException(status_code=404, detail="Lugar no encontrado")
+    if place.created_by != current_user.id:
+        raise HTTPException(status_code=403, detail="No puedes eliminar un lugar que no creaste")
+
+    place.active = False
+    await db.commit()
