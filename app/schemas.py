@@ -32,6 +32,7 @@ class PlaceOut(BaseModel):
     address: Optional[str]
     lat: float
     lng: float
+    created_by: Optional[int]
 
     class Config:
         from_attributes = True
