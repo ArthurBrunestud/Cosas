@@ -28,15 +28,30 @@ async def start_session(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    session = Session(
+    # Abortar cualquier sesión activa previa del mismo worker
+    prev_result = await db.execute(
+        select(Session).where(
+            Session.user_id == current_user.id,
+            Session.status == "active"
+        )
+    )
+    prev_sessions = prev_result.scalars().all()
+    now = datetime.now(timezone.utc)
+    for prev in prev_sessions:
+        prev.status = "aborted"
+        prev.ended_at = now
+        prev.total_minutes = int((now - prev.started_at).total_seconds() / 60)
+
+    new_session = Session(
         user_id=current_user.id,
         place_id=body.place_id,
+        started_at=now,
         status="active"
     )
-    db.add(session)
+    db.add(new_session)
     await db.commit()
-    await db.refresh(session)
-    return session
+    await db.refresh(new_session)
+    return new_session
 
 @router.patch("/{session_id}/end", response_model=SessionEndOut)
 async def end_session(
