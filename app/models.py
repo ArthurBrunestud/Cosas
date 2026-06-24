@@ -111,6 +111,7 @@ class SystemEventLog(Base):
     occurred_at = Column(TIMESTAMP(timezone=True), nullable=False)
     synced = Column(Boolean, nullable=False, default=True)
 
+    session = relationship("Session", back_populates="system_event_logs")  # ← esto faltaba
 
 class PlaceCheckin(Base):
     __tablename__ = "place_checkins"
