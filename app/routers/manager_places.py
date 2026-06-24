@@ -4,7 +4,7 @@ from sqlalchemy import select
 from app.database import get_db
 from app.models import Place, PlaceCheckin, User
 from app.dependencies import get_current_manager
-from app.schemas import PlaceManagerOut, PlaceUpdate, PlaceVisitOut
+from app.schemas import PlaceManagerOut, PlaceUpdate, PlaceVisitOut, PlaceCreate
 
 router = APIRouter()
 
@@ -21,6 +21,32 @@ async def list_places(
         query = query.where(Place.active == True)
     result = await db.execute(query.order_by(Place.name))
     return result.scalars().all()
+
+@router.post("/", response_model=PlaceManagerOut)
+async def create_place_manager(
+    body: PlaceCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_manager)
+):
+    if body.role_assign not in ("vehicular", "convenio"):
+        raise HTTPException(
+            status_code=400,
+            detail="role_assign debe ser 'vehicular' o 'convenio'"
+        )
+
+    place = Place(
+        name=body.name,
+        address=body.address,
+        lat=body.lat,
+        lng=body.lng,
+        active=True,
+        created_by=current_user.id,
+        role_assign=body.role_assign
+    )
+    db.add(place)
+    await db.commit()
+    await db.refresh(place)
+    return place
 
 
 @router.get("/{place_id}", response_model=PlaceManagerOut)
@@ -90,3 +116,24 @@ async def get_place_visits(
         )
         for checkin, worker_name in rows
     ]
+
+@router.delete("/{place_id}", status_code=204)
+async def delete_place_manager(
+    place_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_manager)
+):
+    result = await db.execute(
+        select(Place).where(Place.id == place_id)
+    )
+    place = result.scalar_one_or_none()
+    if not place:
+        raise HTTPException(status_code=404, detail="Lugar no encontrado")
+    if place.created_by != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Solo puedes eliminar lugares que tú creaste"
+        )
+
+    place.active = False
+    await db.commit()

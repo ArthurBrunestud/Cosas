@@ -11,7 +11,6 @@ from datetime import datetime, timezone
 def now_utc():
     return datetime.now(timezone.utc)
 
-
 class User(Base):
     __tablename__ = "users"
 
@@ -22,7 +21,7 @@ class User(Base):
     role = Column(
         String(20),
         nullable=False,
-        info={"check": "role IN ('worker', 'manager')"}
+        info={"check": "role IN ('manager', 'pyme', 'vehicular', 'convenio')"}
     )
     active = Column(Boolean, nullable=False, default=True)
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, default=now_utc)
@@ -30,7 +29,6 @@ class User(Base):
     sessions = relationship("Session", back_populates="user")
     places_created = relationship("Place", back_populates="creator")
     checkins = relationship("PlaceCheckin", back_populates="user")
-
 
 class Place(Base):
     __tablename__ = "places"
@@ -41,13 +39,13 @@ class Place(Base):
     lat = Column(Float, nullable=False)
     lng = Column(Float, nullable=False)
     active = Column(Boolean, nullable=False, default=True)
+    role_assign = Column(String(20), nullable=True)
     created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"))
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, default=now_utc)
 
     creator = relationship("User", back_populates="places_created")
     sessions = relationship("Session", back_populates="place")
     checkins = relationship("PlaceCheckin", back_populates="place")
-
 
 class Session(Base):
     __tablename__ = "sessions"

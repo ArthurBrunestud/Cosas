@@ -25,6 +25,8 @@ class PlaceCreate(BaseModel):
     address: Optional[str] = None
     lat: float
     lng: float
+    # El worker pyme nunca manda role_assign, lo manda solo el manager
+    role_assign: Optional[str] = None
 
 class PlaceOut(BaseModel):
     id: int
@@ -32,7 +34,9 @@ class PlaceOut(BaseModel):
     address: Optional[str]
     lat: float
     lng: float
+    active: bool
     created_by: Optional[int]
+    role_assign: Optional[str]
 
     class Config:
         from_attributes = True
@@ -186,6 +190,7 @@ class PlaceManagerOut(BaseModel):
     lng: float
     active: bool
     created_by: Optional[int]
+    role_assign: Optional[str]
     created_at: datetime
 
     class Config:
@@ -210,17 +215,13 @@ class PlaceVisitOut(BaseModel):
 class DayReportOut(BaseModel):
     date: date
     sessions_started: int
-    total_checkins: int
-    sessions_with_observations: int
-    places_visited_count: int
-    places_visited: list[str]
+    total_hours: float
 
 class WorkerReportOut(BaseModel):
     worker_id: int
     worker_name: str
     total_sessions: int
     total_hours: float
-    total_checkins: int
 
 # ─── Heartbeat ──────────────────────────────────────
 class HeartbeatCreate(BaseModel):
