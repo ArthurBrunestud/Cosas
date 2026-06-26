@@ -9,14 +9,12 @@ from app.schemas import PlaceCreate, PlaceOut, CheckinRequest, CheckinOut
 
 router = APIRouter()
 
-
 @router.get("/", response_model=list[PlaceOut])
 async def list_places(
     q: str = Query(""),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # IDs de todos los managers para identificar lugares "corporativos"
     managers_result = await db.execute(
         select(User.id).where(User.role == "manager")
     )
@@ -28,27 +26,36 @@ async def list_places(
     ]
 
     if current_user.role == "pyme":
-        # pyme ve: sus propios lugares + cualquier lugar creado por un manager
         visibility = or_(
             Place.created_by == current_user.id,
             Place.created_by.in_(manager_ids),
         )
     elif current_user.role in ("vehicular", "convenio"):
-        # vehicular/convenio ve:
-        # - lugares asignados a su rol (creados por manager para ese rol)
-        # - sus propios lugares personales (sin role_assign)
         visibility = or_(
-            (Place.role_assign == current_user.role),
-            (Place.created_by == current_user.id),
+            Place.role_assign == current_user.role,
+            Place.created_by == current_user.id,
         )
     else:
-        # cualquier otro rol (incluido manager si por error llega aquí) no ve nada
         return []
 
     query = select(Place).where(*base_filters, visibility).order_by(Place.name)
     result = await db.execute(query)
-    return result.scalars().all()
+    places = result.scalars().all()
 
+    return [
+        PlaceOut(
+            id=p.id,
+            name=p.name,
+            address=p.address,
+            lat=p.lat,
+            lng=p.lng,
+            active=p.active,
+            created_by=p.created_by,
+            role_assign=p.role_assign,
+            requested_by_role=current_user.role
+        )
+        for p in places
+    ]
 
 @router.post("/", response_model=PlaceOut)
 async def create_place(

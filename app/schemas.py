@@ -37,6 +37,7 @@ class PlaceOut(BaseModel):
     active: bool
     created_by: Optional[int]
     role_assign: Optional[str]
+    requested_by_role: Optional[str] = None
 
     class Config:
         from_attributes = True

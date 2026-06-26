@@ -166,3 +166,29 @@ async def send_heartbeat(
     await db.commit()
     await db.refresh(heartbeat)
     return heartbeat
+
+@router.patch("/{session_id}/abort", response_model=SessionOut)
+async def abort_session(
+    session_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    result = await db.execute(
+        select(Session).where(
+            Session.id == session_id,
+            Session.user_id == current_user.id,
+            Session.status == "active"
+        )
+    )
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Sesión activa no encontrada")
+
+    now = datetime.now(timezone.utc)
+    session.status = "aborted"
+    session.ended_at = now
+    session.total_minutes = int((now - session.started_at).total_seconds() / 60)
+
+    await db.commit()
+    await db.refresh(session)
+    return session
