@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from datetime import datetime, timezone
 from app.database import get_db
 from app.models import Place, PlaceCheckin, User
@@ -16,19 +16,37 @@ async def list_places(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # IDs de todos los managers para identificar lugares "corporativos"
+    managers_result = await db.execute(
+        select(User.id).where(User.role == "manager")
+    )
+    manager_ids = [row[0] for row in managers_result.all()]
+
+    base_filters = [
+        Place.active == True,
+        Place.name.ilike(f"%{q}%"),
+    ]
+
     if current_user.role == "pyme":
-        query = select(Place).where(
-            Place.active == True,
+        # pyme ve: sus propios lugares + cualquier lugar creado por un manager
+        visibility = or_(
             Place.created_by == current_user.id,
-            Place.name.ilike(f"%{q}%")
+            Place.created_by.in_(manager_ids),
+        )
+    elif current_user.role in ("vehicular", "convenio"):
+        # vehicular/convenio ve:
+        # - lugares asignados a su rol (creados por manager para ese rol)
+        # - sus propios lugares personales (sin role_assign)
+        visibility = or_(
+            (Place.role_assign == current_user.role),
+            (Place.created_by == current_user.id),
         )
     else:
-        query = select(Place).where(
-            Place.active == True,
-            Place.role_assign == current_user.role,
-            Place.name.ilike(f"%{q}%")
-        )
-    result = await db.execute(query.order_by(Place.name))
+        # cualquier otro rol (incluido manager si por error llega aquí) no ve nada
+        return []
+
+    query = select(Place).where(*base_filters, visibility).order_by(Place.name)
+    result = await db.execute(query)
     return result.scalars().all()
 
 
@@ -38,11 +56,15 @@ async def create_place(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role != "pyme":
+    # Todos los workers (pyme, vehicular, convenio) pueden crear lugares
+    # personales desde la app. Solo los managers tienen prohibido este endpoint
+    # (ellos usan /manager/places).
+    if current_user.role not in ("pyme", "vehicular", "convenio"):
         raise HTTPException(
             status_code=403,
-            detail="Solo los workers pyme pueden crear lugares desde la app"
+            detail="Este endpoint es solo para trabajadores"
         )
+
     place = Place(
         name=body.name,
         address=body.address,
@@ -50,7 +72,7 @@ async def create_place(
         lng=body.lng,
         active=True,
         created_by=current_user.id,
-        role_assign=None
+        role_assign=None,  # los lugares personales no llevan role_assign
     )
     db.add(place)
     await db.commit()
@@ -86,19 +108,26 @@ async def delete_place(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    if current_user.role != "pyme":
+    # Cualquier worker puede borrar SUS propios lugares (soft-delete).
+    # Nunca puede borrar lugares de otros (ni de un manager ni de otro worker).
+    if current_user.role not in ("pyme", "vehicular", "convenio"):
         raise HTTPException(
             status_code=403,
-            detail="Solo los workers pyme pueden eliminar lugares desde la app"
+            detail="Este endpoint es solo para trabajadores"
         )
+
     result = await db.execute(
         select(Place).where(Place.id == place_id)
     )
     place = result.scalar_one_or_none()
     if not place:
         raise HTTPException(status_code=404, detail="Lugar no encontrado")
+
     if place.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail="No puedes eliminar un lugar que no creaste")
+        raise HTTPException(
+            status_code=403,
+            detail="No puedes eliminar un lugar que no creaste"
+        )
 
     place.active = False
     await db.commit()
