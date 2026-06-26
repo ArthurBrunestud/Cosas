@@ -15,30 +15,20 @@ async def list_places(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    managers_result = await db.execute(
-        select(User.id).where(User.role == "manager")
-    )
-    manager_ids = [row[0] for row in managers_result.all()]
-
-    base_filters = [
-        Place.active == True,
-        Place.name.ilike(f"%{q}%"),
-    ]
-
-    if current_user.role == "pyme":
-        visibility = or_(
-            Place.created_by == current_user.id,
-            Place.created_by.in_(manager_ids),
-        )
-    elif current_user.role in ("vehicular", "convenio"):
-        visibility = or_(
-            Place.role_assign == current_user.role,
-            Place.created_by == current_user.id,
-        )
-    else:
+    if current_user.role not in ("pyme", "vehicular", "convenio"):
         return []
 
-    query = select(Place).where(*base_filters, visibility).order_by(Place.name)
+    visibility = or_(
+        Place.created_by == current_user.id,
+        Place.role_assign == current_user.role
+    )
+
+    query = select(Place).where(
+        Place.active == True,
+        Place.name.ilike(f"%{q}%"),
+        visibility
+    ).order_by(Place.name)
+
     result = await db.execute(query)
     places = result.scalars().all()
 

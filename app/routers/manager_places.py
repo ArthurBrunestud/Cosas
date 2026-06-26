@@ -28,10 +28,10 @@ async def create_place_manager(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_manager)
 ):
-    if body.role_assign not in ("vehicular", "convenio"):
+    if body.role_assign not in ("pyme", "vehicular", "convenio"):
         raise HTTPException(
             status_code=400,
-            detail="role_assign debe ser 'vehicular' o 'convenio'"
+            detail="role_assign debe ser 'pyme', 'vehicular' o 'convenio'"
         )
 
     place = Place(
