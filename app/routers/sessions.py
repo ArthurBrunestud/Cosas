@@ -22,13 +22,69 @@ SEVERE_EVENT_TYPES = {
 }
 NO_INTERNET_THRESHOLD_MINUTES = 60
 
+
+@router.post("/location-logs")
+async def log_location(
+    body: LocationLogRequest,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
+    log = LocationLog(
+        session_id=body.session_id,
+        lat=body.lat,
+        lng=body.lng,
+        accuracy_m=body.accuracy_m,
+        recorded_at=body.recorded_at,
+        uploaded_at=datetime.now(timezone.utc)
+    )
+    db.add(log)
+    await db.commit()
+    return {"ok": True}
+
+
+@router.post("/events", response_model=SystemEventOut)
+async def log_system_event(
+    body: SystemEventCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
+    event = SystemEventLog(
+        session_id=body.session_id,
+        event_type=body.event_type,
+        detail=body.detail,
+        duration_minutes=body.duration_minutes,
+        occurred_at=body.occurred_at,
+        synced=True
+    )
+    db.add(event)
+    await db.commit()
+    await db.refresh(event)
+    return event
+
+
+@router.post("/heartbeat", response_model=HeartbeatOut)
+async def send_heartbeat(
+    body: HeartbeatCreate,
+    db: AsyncSession = Depends(get_db),
+    _: User = Depends(get_current_user)
+):
+    heartbeat = HeartbeatLog(
+        session_id=body.session_id,
+        sent_at=body.sent_at,
+        responded=True
+    )
+    db.add(heartbeat)
+    await db.commit()
+    await db.refresh(heartbeat)
+    return heartbeat
+
+
 @router.post("/", response_model=SessionOut)
 async def start_session(
     body: SessionStart,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # Abortar cualquier sesión activa previa del mismo worker
     prev_result = await db.execute(
         select(Session).where(
             Session.user_id == current_user.id,
@@ -52,6 +108,7 @@ async def start_session(
     await db.commit()
     await db.refresh(new_session)
     return new_session
+
 
 @router.patch("/{session_id}/end", response_model=SessionEndOut)
 async def end_session(
@@ -92,80 +149,6 @@ async def end_session(
     await db.refresh(session)
     return session
 
-@router.post("/location-logs")
-async def log_location(
-    body: LocationLogRequest,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user)
-):
-    log = LocationLog(
-        session_id=body.session_id,
-        lat=body.lat,
-        lng=body.lng,
-        accuracy_m=body.accuracy_m,
-        recorded_at=body.recorded_at,
-        uploaded_at=datetime.now(timezone.utc)
-    )
-    db.add(log)
-    await db.commit()
-    return {"ok": True}
-
-@router.post("/events", response_model=SystemEventOut)
-async def log_system_event(
-    body: SystemEventCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user)
-):
-    event = SystemEventLog(
-        session_id=body.session_id,
-        event_type=body.event_type,
-        detail=body.detail,
-        duration_minutes=body.duration_minutes,
-        occurred_at=body.occurred_at,
-        synced=True
-    )
-    db.add(event)
-    await db.commit()
-    await db.refresh(event)
-    return event
-
-@router.post("/events", response_model=SystemEventOut)
-async def log_system_event(
-    body: SystemEventCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user)
-):
-    event = SystemEventLog(
-        session_id=body.session_id,
-        event_type=body.event_type,
-        detail=body.detail,
-        duration_minutes=body.duration_minutes,
-        occurred_at=body.occurred_at,
-        synced=True
-    )
-    db.add(event)
-    await db.commit()
-    await db.refresh(event)
-    return event
-
-
-
-
-@router.post("/heartbeat", response_model=HeartbeatOut)
-async def send_heartbeat(
-    body: HeartbeatCreate,
-    db: AsyncSession = Depends(get_db),
-    _: User = Depends(get_current_user)
-):
-    heartbeat = HeartbeatLog(
-        session_id=body.session_id,
-        sent_at=body.sent_at,
-        responded=True
-    )
-    db.add(heartbeat)
-    await db.commit()
-    await db.refresh(heartbeat)
-    return heartbeat
 
 @router.patch("/{session_id}/abort", response_model=SessionOut)
 async def abort_session(

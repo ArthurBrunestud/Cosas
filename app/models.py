@@ -61,7 +61,7 @@ class Session(Base):
         String(50),
         nullable=False,
         default="active",
-        info={"check": "status IN ('active', 'completed', 'completed_with_observations')"}
+        info={"check": "status IN ('active', 'completed', 'completed_with_observations', 'aborted')"}
     )
 
     user = relationship("User", back_populates="sessions")
