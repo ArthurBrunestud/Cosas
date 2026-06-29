@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from passlib.context import CryptContext
 from app.database import get_db
 from app.models import User
@@ -16,7 +16,15 @@ async def list_workers(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_manager)
 ):
-    result = await db.execute(select(User).where(User.role == "worker"))
+    result = await db.execute(
+        select(User).where(
+            or_(
+                User.role == "pyme",
+                User.role == "vehicular",
+                User.role == "convenio",
+            )
+        )
+    )
     return result.scalars().all()
 
 
@@ -26,12 +34,23 @@ async def get_worker(
     db: AsyncSession = Depends(get_db),
     _: User = Depends(get_current_manager)
 ):
-    result = await db.execute(select(User).where(User.id == worker_id, User.role == "worker"))
+    result = await db.execute(
+        select(User).where(
+            User.id == worker_id,
+            or_(
+                User.role == "pyme",
+                User.role == "vehicular",
+                User.role == "convenio",
+            )
+        )
+    )
+
     worker = result.scalar_one_or_none()
+
     if not worker:
         raise HTTPException(status_code=404, detail="Trabajador no encontrado")
-    return worker
 
+    return worker
 
 @router.post("/", response_model=WorkerOut)
 async def create_worker(
